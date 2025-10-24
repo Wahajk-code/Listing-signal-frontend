@@ -61,14 +61,35 @@ export default function Home() {
     phone: "",
     timeline: "",
   });
+  const [errors, setErrors] = useState({});
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
+    // Clear error for the field when user types
+    setErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.fullName.trim()) newErrors.fullName = "Full Name is required";
+    if (!formData.email.trim()) newErrors.email = "Email is required";
+    else if (!/\S+@\S+\.\S+/.test(formData.email))
+      newErrors.email = "Invalid email format";
+    if (!formData.address.trim())
+      newErrors.address = "Property Address is required";
+    if (!formData.zip.trim()) newErrors.zip = "Zip Code is required";
+    if (!formData.timeline) newErrors.timeline = "Timeline is required";
+    return newErrors;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
     console.log("Form submitted:", formData);
   };
 
@@ -441,7 +462,7 @@ export default function Home() {
       {/* Form Section */}
       <section
         id="get-signal"
-        className="px-4 py-20 sm:py-28 lg:py-32 bg-white"
+        className="px-4 py-20 sm:py-28 lg:py-32 bg-gray-50"
       >
         <div className="mx-auto max-w-2xl">
           <div className="mb-12 text-center">
@@ -449,111 +470,163 @@ export default function Home() {
               Listing Signal™ Form
             </h2>
             <p
-              className="text-gray-600 animate-fadeInUp"
+              className="text-lg text-gray-600 animate-fadeInUp"
               style={{ animationDelay: "0.2s" }}
             >
               Your personalized report is minutes away. No obligation, just
               clarity.
             </p>
           </div>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid gap-6 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium text-[#09284b] mb-2">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  name="fullName"
-                  placeholder="John Doe"
-                  value={formData.fullName}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-200 bg-white text-[#09284b] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2ca699] transition-all"
-                />
+          <Card className="p-8 bg-white shadow-lg hover:shadow-xl transition-shadow duration-300">
+            <form onSubmit={handleSubmit} className="space-y-8">
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div
+                  className="relative animate-fadeInUp"
+                  style={{ animationDelay: "0.4s" }}
+                >
+                  <label className="block text-sm font-semibold text-[#09284b] mb-2">
+                    Full Name <span className="text-[#2ca699]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="fullName"
+                    placeholder="John Doe"
+                    value={formData.fullName}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-3 rounded-lg border ${
+                      errors.fullName ? "border-red-500" : "border-gray-300"
+                    } bg-white text-[#09284b] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2ca699] hover:border-[#2ca699] transition-all duration-200`}
+                  />
+                  {errors.fullName && (
+                    <p className="mt-1 text-xs text-red-500">
+                      {errors.fullName}
+                    </p>
+                  )}
+                </div>
+                <div
+                  className="relative animate-fadeInUp"
+                  style={{ animationDelay: "0.5s" }}
+                >
+                  <label className="block text-sm font-semibold text-[#09284b] mb-2">
+                    Email <span className="text-[#2ca699]">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder="john@example.com"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-3 rounded-lg border ${
+                      errors.email ? "border-red-500" : "border-gray-300"
+                    } bg-white text-[#09284b] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2ca699] hover:border-[#2ca699] transition-all duration-200`}
+                  />
+                  {errors.email && (
+                    <p className="mt-1 text-xs text-red-500">{errors.email}</p>
+                  )}
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-[#09284b] mb-2">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="john@example.com"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-200 bg-white text-[#09284b] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2ca699] transition-all"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[#09284b] mb-2">
-                Property Address *
-              </label>
-              <input
-                type="text"
-                name="address"
-                placeholder="123 Main St, City, State"
-                value={formData.address}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 rounded-lg border border-gray-200 bg-white text-[#09284b] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2ca699] transition-all"
-              />
-            </div>
-            <div className="grid gap-6 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium text-[#09284b] mb-2">
-                  Zip Code *
-                </label>
-                <input
-                  type="text"
-                  name="zip"
-                  placeholder="12345"
-                  value={formData.zip}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-200 bg-white text-[#09284b] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2ca699] transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#09284b] mb-2">
-                  Phone
-                </label>
-                <input
-                  type="tel"
-                  name="phone"
-                  placeholder="(555) 123-4567"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-200 bg-white text-[#09284b] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2ca699] transition-all"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[#09284b] mb-2">
-                Timeline *
-              </label>
-              <select
-                name="timeline"
-                value={formData.timeline}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 rounded-lg border border-gray-200 bg-white text-[#09284b] focus:outline-none focus:ring-2 focus:ring-[#2ca699] transition-all"
+              <div
+                className="relative animate-fadeInUp"
+                style={{ animationDelay: "0.6s" }}
               >
-                <option value="">Select timeline...</option>
-                <option value="ASAP">Immediately</option>
-                <option value="1-3 Months">Within 1 month</option>
-                <option value="3-6 Months">Within 3 months</option>
-                <option value="6+ Months">Within 6 months</option>
-              </select>
-            </div>
-            <Button
-              size="lg"
-              className="w-full bg-[#2ca699] hover:bg-[#23917a] text-white"
-            >
-              Get My Listing Signal™
-            </Button>
-            <p className="text-xs text-gray-600 text-center">
-              By submitting, I agree to receive my Listing Signal™ report and
-              follow-up from Listing Signal™. I can unsubscribe anytime.
-            </p>
-          </form>
+                <label className="block text-sm font-semibold text-[#09284b] mb-2">
+                  Property Address <span className="text-[#2ca699]">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="address"
+                  placeholder="123 Main St, City, State"
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-3 rounded-lg border ${
+                    errors.address ? "border-red-500" : "border-gray-300"
+                  } bg-white text-[#09284b] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2ca699] hover:border-[#2ca699] transition-all duration-200`}
+                />
+                {errors.address && (
+                  <p className="mt-1 text-xs text-red-500">{errors.address}</p>
+                )}
+              </div>
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div
+                  className="relative animate-fadeInUp"
+                  style={{ animationDelay: "0.7s" }}
+                >
+                  <label className="block text-sm font-semibold text-[#09284b] mb-2">
+                    Zip Code <span className="text-[#2ca699]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="zip"
+                    placeholder="12345"
+                    value={formData.zip}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-3 rounded-lg border ${
+                      errors.zip ? "border-red-500" : "border-gray-300"
+                    } bg-white text-[#09284b] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2ca699] hover:border-[#2ca699] transition-all duration-200`}
+                  />
+                  {errors.zip && (
+                    <p className="mt-1 text-xs text-red-500">{errors.zip}</p>
+                  )}
+                </div>
+                <div
+                  className="relative animate-fadeInUp"
+                  style={{ animationDelay: "0.8s" }}
+                >
+                  <label className="block text-sm font-semibold text-[#09284b] mb-2">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    placeholder="(555) 123-4567"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-[#09284b] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2ca699] hover:border-[#2ca699] transition-all duration-200"
+                  />
+                </div>
+              </div>
+              <div
+                className="relative animate-fadeInUp"
+                style={{ animationDelay: "0.9s" }}
+              >
+                <label className="block text-sm font-semibold text-[#09284b] mb-2">
+                  Timeline <span className="text-[#2ca699]">*</span>
+                </label>
+                <select
+                  name="timeline"
+                  value={formData.timeline}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-3 rounded-lg border ${
+                    errors.timeline ? "border-red-500" : "border-gray-300"
+                  } bg-white text-[#09284b] focus:outline-none focus:ring-2 focus:ring-[#2ca699] hover:border-[#2ca699] transition-all duration-200`}
+                >
+                  <option value="">Select timeline...</option>
+                  <option value="ASAP">Immediately</option>
+                  <option value="1-3 Months">Within 1 month</option>
+                  <option value="3-6 Months">Within 3 months</option>
+                  <option value="6+ Months">Within 6 months</option>
+                </select>
+                {errors.timeline && (
+                  <p className="mt-1 text-xs text-red-500">{errors.timeline}</p>
+                )}
+              </div>
+              <Button
+                size="lg"
+                className="w-full bg-[#2ca699] hover:bg-[#23917a] text-white transform hover:scale-105 transition-transform duration-200 animate-fadeInUp"
+                style={{ animationDelay: "1.0s" }}
+              >
+                Get My Listing Signal™
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+              <p
+                className="text-sm text-gray-500 text-center italic animate-fadeInUp"
+                style={{ animationDelay: "1.1s" }}
+              >
+                By submitting, I agree to receive my Listing Signal™ report and
+                follow-up from Listing Signal™. I can unsubscribe anytime.
+              </p>
+            </form>
+          </Card>
         </div>
       </section>
 

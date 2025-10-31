@@ -90,7 +90,7 @@ export default function Home() {
       setErrors(validationErrors);
       return;
     }
-    console.log("Form submitted:", formData);
+    console.log("Form submitted::", formData);
   };
 
   const handleScroll = (e, sectionId) => {

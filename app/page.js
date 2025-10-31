@@ -1,7 +1,7 @@
 'use client'
 
 import { ArrowRight, CheckCircle2, MapPin, TrendingUp, Zap } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 // Button Component
 const Button = ({
@@ -56,6 +56,9 @@ export default function Home () {
     timeline: ''
   })
   const [errors, setErrors] = useState({})
+  const [isVisible, setIsVisible] = useState({})
+  const heroRef = useRef(null)
+  const featuresRef = useRef(null)
 
   const handleInputChange = e => {
     const { name, value } = e.target
@@ -95,6 +98,31 @@ export default function Home () {
     }
   }
 
+  useEffect(() => {
+    const observerOptions = {
+      threshold: 0.2,
+      rootMargin: '0px'
+    }
+
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        setIsVisible(prev => ({
+          ...prev,
+          [entry.target.id]: entry.isIntersecting
+        }))
+      })
+    }, observerOptions)
+
+    const elementsToObserve = [heroRef.current, featuresRef.current].filter(
+      Boolean
+    )
+    elementsToObserve.forEach(el => observer.observe(el))
+
+    return () => {
+      elementsToObserve.forEach(el => observer.unobserve(el))
+    }
+  }, [])
+
   return (
     <div className='min-h-screen bg-white'>
       <style jsx global>{`
@@ -121,11 +149,33 @@ export default function Home () {
             transform: translateX(0);
           }
         }
+        @keyframes fadeInUpScroll {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
         .animate-fadeInUp {
           animation: fadeInUp 0.6s ease-out forwards;
         }
         .animate-slideIn {
           animation: slideIn 0.8s ease-out forwards;
+        }
+        .animate-fadeInUp-scroll {
+          animation: fadeInUpScroll 0.8s ease-out forwards;
+        }
+        .scroll-hidden {
+          opacity: 0;
+          transform: translateY(30px);
+          transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+        }
+        .scroll-visible {
+          opacity: 1;
+          transform: translateY(0);
         }
         .bg-hero-image {
           background-image: linear-gradient(
@@ -190,22 +240,35 @@ export default function Home () {
 
       {/* Hero Section */}
       <section
+        ref={heroRef}
         id='home'
         className='relative bg-hero-image px-4 py-20 sm:py-32 lg:py-40 text-white'
       >
         <div className='mx-auto max-w-7xl flex flex-col items-center'>
-          <h1 className='text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-center max-w-2xl mb-6 text-balance animate-fadeInUp'>
+          <h1
+            className={`text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-center max-w-2xl mb-6 text-balance transition-all duration-700 ${
+              isVisible.home
+                ? 'opacity-100 translate-y-0'
+                : 'opacity-0 translate-y-10'
+            }`}
+          >
             Timing, Decoded.
           </h1>
           <p
-            className='text-lg sm:text-xl text-center max-w-3xl mb-4 leading-relaxed animate-fadeInUp'
-            style={{ animationDelay: '0.2s' }}
+            className={`text-lg sm:text-xl text-center max-w-3xl mb-4 leading-relaxed transition-all duration-700 delay-150 ${
+              isVisible.home
+                ? 'opacity-100 translate-y-0'
+                : 'opacity-0 translate-y-10'
+            }`}
           >
             The clarity to know when the market is on your side.
           </p>
           <p
-            className='text-base sm:text-lg text-center max-w-3xl mb-10 leading-relaxed animate-fadeInUp'
-            style={{ animationDelay: '0.2s' }}
+            className={`text-base sm:text-lg text-center max-w-3xl mb-10 leading-relaxed transition-all duration-700 delay-200 ${
+              isVisible.home
+                ? 'opacity-100 translate-y-0'
+                : 'opacity-0 translate-y-10'
+            }`}
           >
             Every Home Sends a Signal — We Read It.
           </p>
@@ -229,8 +292,12 @@ export default function Home () {
             ].map((feature, idx) => (
               <Card
                 key={idx}
-                className='border border-gray-200 bg-white/10 backdrop-blur-sm p-6 text-center group hover:shadow-lg hover:border-[#2ca699] transition-all duration-300 animate-fadeInUp'
-                style={{ animationDelay: `${0.4 + idx * 0.2}s` }}
+                className={`border border-gray-200 bg-white/10 backdrop-blur-sm p-6 text-center group hover:shadow-lg hover:border-[#2ca699] transition-all duration-700 ${
+                  isVisible.home
+                    ? 'opacity-100 translate-y-0'
+                    : 'opacity-0 translate-y-10'
+                }`}
+                style={{ transitionDelay: `${300 + idx * 100}ms` }}
               >
                 <feature.icon className='h-10 w-10 text-[#2ca699] mx-auto mb-4 group-hover:text-white group-hover:scale-110 transition-transform duration-300' />
                 <h3 className='text-lg font-semibold text-white mb-2'>
@@ -241,8 +308,12 @@ export default function Home () {
             ))}
           </div>
           <div
-            className='flex flex-col gap-3 sm:flex-row animate-fadeInUp'
-            style={{ animationDelay: '1.0s' }}
+            className={`flex flex-col gap-3 sm:flex-row transition-all duration-700 ${
+              isVisible.home
+                ? 'opacity-100 translate-y-0'
+                : 'opacity-0 translate-y-10'
+            }`}
+            style={{ transitionDelay: '600ms' }}
           >
             <Button
               size='lg'
@@ -263,15 +334,28 @@ export default function Home () {
       </section>
 
       {/* Features Section */}
-      <section className='px-4 py-20 sm:py-28 lg:py-32 bg-white'>
+      <section
+        ref={featuresRef}
+        id='features'
+        className='px-4 py-20 sm:py-28 lg:py-32 bg-white'
+      >
         <div className='mx-auto max-w-7xl'>
           <div className='mb-16 text-center'>
-            <h2 className='text-3xl font-bold tracking-tight text-[#09284b] sm:text-4xl mb-4 animate-fadeInUp'>
+            <h2
+              className={`text-3xl font-bold tracking-tight text-[#09284b] sm:text-4xl mb-4 transition-all duration-700 ${
+                isVisible.features
+                  ? 'opacity-100 translate-y-0'
+                  : 'opacity-0 translate-y-10'
+              }`}
+            >
               Inside your Signal
             </h2>
             <p
-              className='text-lg text-gray-600 max-w-2xl mx-auto animate-fadeInUp'
-              style={{ animationDelay: '0.2s' }}
+              className={`text-lg text-gray-600 max-w-2xl mx-auto transition-all duration-700 delay-150 ${
+                isVisible.features
+                  ? 'opacity-100 translate-y-0'
+                  : 'opacity-0 translate-y-10'
+              }`}
             >
               We translate 250+ live data points into one clear Signal to Sell
               Score.
@@ -297,8 +381,12 @@ export default function Home () {
             ].map((feature, idx) => (
               <Card
                 key={idx}
-                className='border border-gray-200 bg-white p-8 hover:shadow-lg hover:border-[#2ca699] transition-all duration-300 animate-fadeInUp'
-                style={{ animationDelay: `${0.4 + idx * 0.2}s` }}
+                className={`border border-gray-200 bg-white p-8 hover:shadow-lg hover:border-[#2ca699] transition-all duration-700 ${
+                  isVisible.features
+                    ? 'opacity-100 translate-y-0'
+                    : 'opacity-0 translate-y-10'
+                }`}
+                style={{ transitionDelay: `${300 + idx * 100}ms` }}
               >
                 <feature.icon className='h-10 w-10 text-[#2ca699] mb-4' />
                 <h3 className='text-xl font-semibold text-[#09284b] mb-2'>
@@ -309,8 +397,12 @@ export default function Home () {
             ))}
           </div>
           <div
-            className='mt-12 text-center animate-fadeInUp'
-            style={{ animationDelay: '1.0s' }}
+            className={`mt-12 text-center transition-all duration-700 ${
+              isVisible.features
+                ? 'opacity-100 translate-y-0'
+                : 'opacity-0 translate-y-10'
+            }`}
+            style={{ transitionDelay: '600ms' }}
           >
             <Button
               size='lg'
@@ -445,15 +537,42 @@ export default function Home () {
             Your personalized report is minutes away. No obligation, just
             clarity.
           </p>
+          <div className="grid grid-cols-2 gap-5 justify-center w-full ">
           <Button
-            size='lg'
-            variant='secondary'
-            className='bg-white text-[#09284b] hover:bg-[#23917a] hover:text-white animate-fadeInUp'
-            style={{ animationDelay: '0.4s' }}
-          >
-            Get Started Now
-            <ArrowRight className='ml-2 h-4 w-4' />
-          </Button>
+              size='lg'
+              variant='secondary'
+              className='bg-white text-[#09284b] hover:bg-[#23917a] hover:text-white animate-fadeInUp'
+              style={{ animationDelay: '0.4s' }}
+            >
+              Check My Signal
+              <ArrowRight className='ml-2 h-4 w-4' />
+            </Button>
+            <Button
+              size='lg'
+              variant='secondary'
+              className='bg-white text-[#09284b] hover:bg-[#23917a] hover:text-white animate-fadeInUp'
+              style={{ animationDelay: '0.4s' }}
+            >
+              See My Report <ArrowRight className='ml-2 h-4 w-4' />
+            </Button>
+            <Button
+              size='lg'
+              variant='secondary'
+              className='bg-white text-[#09284b] hover:bg-[#23917a] hover:text-white animate-fadeInUp'
+              style={{ animationDelay: '0.4s' }}
+            >
+              Get My Report <ArrowRight className='ml-2 h-4 w-4' />
+            </Button>
+            <Button
+              size='lg'
+              variant='secondary'
+              className='bg-white text-[#09284b] hover:bg-[#23917a] hover:text-white animate-fadeInUp'
+              style={{ animationDelay: '0.4s' }}
+            >
+              Decode My Timing
+              <ArrowRight className='ml-2 h-4 w-4' />
+            </Button>
+          </div>
         </div>
       </section>
 

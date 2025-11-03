@@ -17,6 +17,108 @@ const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
   "https://listingsignal.com";
 
+const US_STATE_ABBREVIATIONS = {
+  alabama: "AL",
+  alaska: "AK",
+  arizona: "AZ",
+  arkansas: "AR",
+  california: "CA",
+  colorado: "CO",
+  connecticut: "CT",
+  delaware: "DE",
+  florida: "FL",
+  georgia: "GA",
+  hawaii: "HI",
+  idaho: "ID",
+  illinois: "IL",
+  indiana: "IN",
+  iowa: "IA",
+  kansas: "KS",
+  kentucky: "KY",
+  louisiana: "LA",
+  maine: "ME",
+  maryland: "MD",
+  massachusetts: "MA",
+  michigan: "MI",
+  minnesota: "MN",
+  mississippi: "MS",
+  missouri: "MO",
+  montana: "MT",
+  nebraska: "NE",
+  nevada: "NV",
+  "new hampshire": "NH",
+  "new jersey": "NJ",
+  "new mexico": "NM",
+  "new york": "NY",
+  "north carolina": "NC",
+  "north dakota": "ND",
+  ohio: "OH",
+  oklahoma: "OK",
+  oregon: "OR",
+  pennsylvania: "PA",
+  "rhode island": "RI",
+  "south carolina": "SC",
+  "south dakota": "SD",
+  tennessee: "TN",
+  texas: "TX",
+  utah: "UT",
+  vermont: "VT",
+  virginia: "VA",
+  washington: "WA",
+  "west virginia": "WV",
+  wisconsin: "WI",
+  wyoming: "WY",
+  "district of columbia": "DC",
+};
+
+const toStateCode = (value = "") => {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (/^[A-Za-z]{2}$/.test(trimmed)) {
+    return trimmed.toUpperCase();
+  }
+  const lookup = trimmed.toLowerCase();
+  return US_STATE_ABBREVIATIONS[lookup] || "";
+};
+
+const extractCityFromAddressComponents = (components = {}) => {
+  return (
+    components.city ||
+    components.town ||
+    components.village ||
+    components.hamlet ||
+    components.municipality ||
+    components.locality ||
+    components.county ||
+    ""
+  );
+};
+
+const extractStateFromAddressComponents = (components = {}) => {
+  const directStateCode =
+    components.state_code ||
+    components.region_code ||
+    components.province_code ||
+    "";
+  if (directStateCode) {
+    return directStateCode.toUpperCase();
+  }
+
+  const stateName =
+    components.state ||
+    components.region ||
+    components.province ||
+    components.state_district ||
+    "";
+
+  const normalized = toStateCode(stateName);
+  if (normalized) {
+    return normalized;
+  }
+
+  return stateName || "";
+};
+
 // Button Component
 const Button = ({
   children,
@@ -262,22 +364,34 @@ const parseCityState = (address = "") => {
     .map((part) => part.trim())
     .filter(Boolean);
 
-  let city = "Unknown";
-  let state = "NA";
+  const zipIndex = parts.findIndex((part) => /^\d{5}(?:-\d{4})?$/.test(part));
 
-  if (parts.length >= 3) {
-    city = parts[parts.length - 2];
-    state = parts[parts.length - 1];
-  } else if (parts.length === 2) {
-    [city, state] = parts;
-  } else if (parts.length === 1) {
-    city = parts[0];
+  let stateCandidate = "";
+  let cityCandidate = "";
+
+  if (zipIndex > 0) {
+    stateCandidate = parts[zipIndex - 1];
+    for (let i = zipIndex - 2; i >= 0; i -= 1) {
+      const candidate = parts[i];
+      if (!/county/i.test(candidate) && !/^\d+/.test(candidate)) {
+        cityCandidate = candidate;
+        break;
+      }
+    }
   }
 
-  if (city.length < 2) city = "Unknown";
-  if (state.length < 2) state = "NA";
+  if (!stateCandidate && parts.length >= 2) {
+    stateCandidate = parts[parts.length - 1];
+    cityCandidate = parts[parts.length - 2];
+  } else if (!stateCandidate && parts.length === 1) {
+    cityCandidate = parts[0];
+  }
 
-  return { city, state };
+  const normalizedState = toStateCode(stateCandidate) || stateCandidate || "NA";
+  const normalizedCity =
+    cityCandidate && cityCandidate.length >= 2 ? cityCandidate : "Unknown";
+
+  return { city: normalizedCity, state: normalizedState };
 };
 
 const API_URL = process.env.NEXT_PUBLIC_LISTING_SIGNAL_API_URL;
@@ -351,6 +465,8 @@ export default function Home() {
     address: "",
     zip: "",
     phone: "",
+    city: "",
+    state: "",
     timeline: "",
     intent: "",
   };
@@ -441,7 +557,14 @@ export default function Home() {
       nextValue = formatZipInput(value);
     }
 
-    setFormData({ ...formData, [name]: nextValue });
+    setFormData((prev) => {
+      const updated = { ...prev, [name]: nextValue };
+      if (name === "address") {
+        updated.city = "";
+        updated.state = "";
+      }
+      return updated;
+    });
     if (name === "address") {
       setAddressVerified(false);
     }
@@ -451,10 +574,16 @@ export default function Home() {
   };
 
   const handleAddressSelect = (suggestion) => {
+    const suggestionAddress = suggestion.address || {};
+    const suggestionCity = extractCityFromAddressComponents(suggestionAddress);
+    const suggestionState =
+      extractStateFromAddressComponents(suggestionAddress);
     setFormData((prev) => ({
       ...prev,
       address: suggestion.label,
       zip: suggestion.address?.postcode || prev.zip,
+      city: suggestionCity || prev.city,
+      state: suggestionState || prev.state,
     }));
     setAddressVerified(true);
     setErrors((prev) => ({ ...prev, address: "", zip: "" }));
@@ -514,14 +643,25 @@ export default function Home() {
       return;
     }
 
-    const { city, state } = parseCityState(formData.address);
+    const fallbackLocation = parseCityState(formData.address);
+    const city = formData.city || fallbackLocation.city;
+    const state =
+      formData.state ||
+      toStateCode(fallbackLocation.state) ||
+      fallbackLocation.state;
+    const cleanedCity = city ? city.trim() : "";
+    const cleanedState =
+      state && state.length === 2
+        ? state.trim().toUpperCase()
+        : state?.trim() || "";
+
     const payload = {
       fullName: formData.fullName.trim(),
       email: formData.email.trim(),
       phone: formData.phone.trim(),
       streetAddress: formData.address.trim(),
-      city,
-      state,
+      city: cleanedCity,
+      state: cleanedState,
       zip: formData.zip.trim(),
       timeline: formData.timeline,
       responseMode: "json",

@@ -10,7 +10,12 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import Script from "next/script";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
+  "https://listingsignal.com";
 
 // Button Component
 const Button = ({
@@ -21,7 +26,7 @@ const Button = ({
   ...props
 }) => {
   const baseStyles =
-    "inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ca699]";
+    "inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2ca699] disabled:cursor-not-allowed disabled:opacity-60";
   const variants = {
     default: "bg-[#2ca699] text-white hover:bg-[#23917a]",
     secondary: "bg-white text-[#09284b] hover:bg-[#23917a] hover:text-white",
@@ -68,11 +73,16 @@ const AddressAutocomplete = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchTimeoutRef = useRef(null);
   const containerRef = useRef(null);
+  const cacheRef = useRef({});
+  const activeRequestRef = useRef(null);
 
   useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
+      }
+      if (activeRequestRef.current) {
+        activeRequestRef.current.abort();
       }
     };
   }, []);
@@ -92,21 +102,48 @@ const AddressAutocomplete = ({
   }, []);
 
   const fetchSuggestions = async (query) => {
+    if (cacheRef.current[query]) {
+      setSuggestions(cacheRef.current[query]);
+      setLoadingSuggestions(false);
+      return;
+    }
+
+    if (activeRequestRef.current) {
+      activeRequestRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    activeRequestRef.current = controller;
+    setLoadingSuggestions(true);
+
     try {
-      setLoadingSuggestions(true);
       const response = await fetch(
-        `/api/address-search?query=${encodeURIComponent(query)}`
+        `/api/address-search?query=${encodeURIComponent(query)}`,
+        {
+          signal: controller.signal,
+        }
       );
       if (!response.ok) {
         throw new Error("Failed to fetch suggestions");
       }
       const data = await response.json();
-      setSuggestions(data.suggestions || []);
+      const nextSuggestions = data.suggestions || [];
+      cacheRef.current[query] = nextSuggestions;
+      if (activeRequestRef.current === controller) {
+        setSuggestions(nextSuggestions);
+      }
     } catch (error) {
-      console.error("Address lookup error:", error);
-      setSuggestions([]);
+      if (error.name !== "AbortError") {
+        console.error("Address lookup error:", error);
+        if (activeRequestRef.current === controller) {
+          setSuggestions([]);
+        }
+      }
     } finally {
-      setLoadingSuggestions(false);
+      if (activeRequestRef.current === controller) {
+        setLoadingSuggestions(false);
+        activeRequestRef.current = null;
+      }
     }
   };
 
@@ -117,14 +154,28 @@ const AddressAutocomplete = ({
       clearTimeout(searchTimeoutRef.current);
     }
     if (!query || query.length < 3) {
+      if (activeRequestRef.current) {
+        activeRequestRef.current.abort();
+        activeRequestRef.current = null;
+      }
       setSuggestions([]);
       setShowSuggestions(false);
+      setLoadingSuggestions(false);
       return;
     }
     setShowSuggestions(true);
+    if (cacheRef.current[query]) {
+      if (activeRequestRef.current) {
+        activeRequestRef.current.abort();
+        activeRequestRef.current = null;
+      }
+      setSuggestions(cacheRef.current[query]);
+      setLoadingSuggestions(false);
+      return;
+    }
     searchTimeoutRef.current = setTimeout(() => {
       fetchSuggestions(query);
-    }, 300);
+    }, 150);
   };
 
   const handleSelect = (suggestion) => {
@@ -191,6 +242,46 @@ const AddressAutocomplete = ({
   );
 };
 
+const formatPhoneInput = (value = "") => {
+  const digits = value.replace(/\D/g, "").slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6)
+    return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+};
+
+const formatZipInput = (value = "") => {
+  const digits = value.replace(/\D/g, "").slice(0, 9);
+  if (digits.length <= 5) return digits;
+  return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+};
+
+const parseCityState = (address = "") => {
+  const parts = address
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  let city = "Unknown";
+  let state = "NA";
+
+  if (parts.length >= 3) {
+    city = parts[parts.length - 2];
+    state = parts[parts.length - 1];
+  } else if (parts.length === 2) {
+    [city, state] = parts;
+  } else if (parts.length === 1) {
+    city = parts[0];
+  }
+
+  if (city.length < 2) city = "Unknown";
+  if (state.length < 2) state = "NA";
+
+  return { city, state };
+};
+
+const API_URL = process.env.NEXT_PUBLIC_LISTING_SIGNAL_API_URL;
+
 const heroSlides = [
   {
     icon: TrendingUp,
@@ -236,11 +327,21 @@ const howItWorksSteps = [
   },
 ];
 
+const howItWorksOfferCatalog = howItWorksSteps.map((step, index) => ({
+  "@type": "ListItem",
+  position: index + 1,
+  name: step.title,
+  description: step.description,
+}));
+
+const CTA_TARGET_ID = "get-signal";
+const CTA_TARGET_URL = `${SITE_URL}#${CTA_TARGET_ID}`;
+
 const ctaOptions = [
-  { label: "Check My Signal", target: "inside-signal" },
-  { label: "See My Score", target: "signal-score" },
-  { label: "Get My Report", target: "get-signal" },
-  { label: "Decode My Timing", target: "how-it-works" },
+  { label: "Check My Signal" },
+  { label: "See My Score" },
+  { label: "Get My Report" },
+  { label: "Decode My Timing" },
 ];
 
 export default function Home() {
@@ -267,13 +368,78 @@ export default function Home() {
   const [smsPhone, setSmsPhone] = useState("");
   const [smsConsent, setSmsConsent] = useState(false);
   const [smsError, setSmsError] = useState("");
+  const [submissionError, setSubmissionError] = useState("");
+  const structuredData = useMemo(
+    () => ({
+      "@context": "https://schema.org",
+      "@type": "Service",
+      name: "Listing Signal",
+      alternateName: "Listing Signal™",
+      description:
+        "Listing Signal™ delivers a personalized Signal to Sell Score so homeowners know the best moment to list, backed by 250+ real-time market indicators.",
+      url: SITE_URL,
+      image: [`${SITE_URL}/logo.png`],
+      serviceType: "Real estate listing timing intelligence",
+      brand: {
+        "@type": "Brand",
+        name: "Listing Signal",
+      },
+      provider: {
+        "@type": "Organization",
+        name: "Listing Signal",
+        url: SITE_URL,
+        logo: `${SITE_URL}/logo.png`,
+      },
+      areaServed: {
+        "@type": "Country",
+        name: "United States",
+      },
+      audience: {
+        "@type": "Audience",
+        audienceType: [
+          "Home sellers",
+          "Property owners preparing to list",
+          "Real estate clients seeking timing strategy",
+        ],
+      },
+      keywords: [
+        "listing signal",
+        "real estate timing",
+        "home selling data",
+        "signal to sell score",
+        "listing strategy",
+      ],
+      offers: {
+        "@type": "Offer",
+        name: "Listing Signal Timing Report",
+        price: "0",
+        priceCurrency: "USD",
+        availability: "https://schema.org/InStock",
+        url: CTA_TARGET_URL,
+      },
+      hasOfferCatalog: {
+        "@type": "OfferCatalog",
+        name: "How Listing Signal Works",
+        itemListElement: howItWorksOfferCatalog,
+      },
+      potentialAction: {
+        "@type": "RegisterAction",
+        name: "Request your Listing Signal report",
+        target: CTA_TARGET_URL,
+      },
+    }),
+    []
+  );
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    const nextValue =
-      name === "phone"
-        ? value.replace(/[^\d()+\-\s]/g, "")
-        : value;
+    let nextValue = value;
+
+    if (name === "phone") {
+      nextValue = formatPhoneInput(value);
+    } else if (name === "zip") {
+      nextValue = formatZipInput(value);
+    }
 
     setFormData({ ...formData, [name]: nextValue });
     if (name === "address") {
@@ -281,6 +447,7 @@ export default function Home() {
     }
     // Clear error for the field when user types
     setErrors((prev) => ({ ...prev, [name]: "" }));
+    setSubmissionError("");
   };
 
   const handleAddressSelect = (suggestion) => {
@@ -291,11 +458,13 @@ export default function Home() {
     }));
     setAddressVerified(true);
     setErrors((prev) => ({ ...prev, address: "", zip: "" }));
+    setSubmissionError("");
   };
 
   const handleConfirmToggle = (e) => {
     setConfirmDetails(e.target.checked);
     setErrors((prev) => ({ ...prev, confirmDetails: "" }));
+    setSubmissionError("");
   };
 
   const resetForm = () => {
@@ -303,6 +472,7 @@ export default function Home() {
     setErrors({});
     setConfirmDetails(false);
     setAddressVerified(false);
+    setSubmissionError("");
   };
 
   const validateForm = () => {
@@ -321,7 +491,11 @@ export default function Home() {
       newErrors.phone = "Phone number is required";
     else if (digitsOnly.length < 10)
       newErrors.phone = "Enter a valid phone number.";
-    if (!formData.zip.trim()) newErrors.zip = "Zip Code is required";
+    const zipValue = formData.zip.trim();
+    const zipRegex = /^\d{5}(?:-\d{4})?$/;
+    if (!zipValue) newErrors.zip = "Zip Code is required";
+    else if (!zipRegex.test(zipValue))
+      newErrors.zip = "Enter a valid 5-digit ZIP (optionally with +4).";
     if (!formData.timeline) newErrors.timeline = "Timeline is required";
     if (!formData.intent)
       newErrors.intent = "Please share your selling timeline.";
@@ -331,18 +505,61 @@ export default function Home() {
     return newErrors;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmissionError("");
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       return;
     }
-    console.log("Form submitted:", formData);
+
+    const { city, state } = parseCityState(formData.address);
+    const payload = {
+      fullName: formData.fullName.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone.trim(),
+      streetAddress: formData.address.trim(),
+      city,
+      state,
+      zip: formData.zip.trim(),
+      timeline: formData.timeline,
+      responseMode: "json",
+    };
+
+    if (!API_URL) {
+      console.error("Missing NEXT_PUBLIC_LISTING_SIGNAL_API_URL environment variable.");
+      setSubmissionError(
+        "We’re unable to reach the Listing Signal service right now. Please try again soon."
+      );
+      return;
+    }
+
     setSubmissionStage("loading");
     setSmsConsent(false);
     setSmsError("");
     setSmsPhone(formData.phone);
+
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Request failed");
+      }
+    } catch (error) {
+      console.error("Listing Signal API error:", error);
+      setSubmissionStage("form");
+      setSubmissionError(
+        "Something went wrong sending your request. Please double-check your details or try again later."
+      );
+      return;
+    }
+
     if (submitTimerRef.current) {
       clearTimeout(submitTimerRef.current);
     }
@@ -382,6 +599,7 @@ export default function Home() {
     setSmsError("");
     setSmsConsent(false);
     setSubmissionStage("completed");
+    setSubmissionError("");
   };
 
   const handleFinish = () => {
@@ -390,11 +608,12 @@ export default function Home() {
     setSmsConsent(false);
     setSmsPhone("");
     setSmsError("");
+    setSubmissionError("");
   };
 
   const handleSmsPhoneChange = (e) => {
-    const sanitized = e.target.value.replace(/[^\d()+\-\s]/g, "");
-    setSmsPhone(sanitized);
+    const formatted = formatPhoneInput(e.target.value);
+    setSmsPhone(formatted);
     setSmsError("");
   };
 
@@ -449,8 +668,16 @@ export default function Home() {
       : "Monitoring";
 
   return (
-    <div className="min-h-screen bg-white">
-      <style jsx global>{`
+    <>
+      <Script
+        id="listing-signal-structured-data"
+        type="application/ld+json"
+        strategy="afterInteractive"
+      >
+        {JSON.stringify(structuredData)}
+      </Script>
+      <div className="min-h-screen bg-white">
+        <style jsx global>{`
         html {
           scroll-behavior: smooth;
         }
@@ -688,8 +915,8 @@ export default function Home() {
               <Button
                 key={cta.label}
                 size="lg"
-                onClick={(e) => handleScroll(cta.target, e)}
-                className="group bg-[#2ca699] text-white hover:bg-white hover:text-[#061a33] transition-all duration-300"
+                onClick={(e) => handleScroll(CTA_TARGET_ID, e)}
+                className="group bg-[#2ca699] text-white shadow-lg shadow-[#05203f]/20 transition-all duration-300 hover:bg-[#23917a] hover:shadow-[#05203f]/30"
               >
                 {cta.label}
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
@@ -930,14 +1157,13 @@ export default function Home() {
             className="mx-auto grid max-w-2xl gap-3 sm:grid-cols-2 animate-fadeInUp"
             style={{ animationDelay: "0.35s" }}
           >
-            {ctaOptions.map((cta, idx) => (
+            {ctaOptions.map((cta) => (
               <Button
                 key={cta.label}
+                variant="default"
                 size="lg"
-                onClick={(e) => handleScroll(cta.target, e)}
-                className={`bg-white text-[#09284b] transition-all duration-300 hover:bg-[#061a33] hover:text-white ${
-                  idx % 2 === 0 ? "border border-white/20" : "border border-white/40"
-                }`}
+                onClick={(e) => handleScroll(CTA_TARGET_ID, e)}
+                className="shadow-lg shadow-[#021b36]/20 transition-all duration-300 hover:bg-[#23917a] hover:shadow-[#021b36]/30 focus:ring-offset-[#0e3d70]"
               >
                 {cta.label}
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -1160,8 +1386,14 @@ export default function Home() {
                   <p className="mt-2 text-xs text-red-500">{errors.confirmDetails}</p>
                 )}
               </div>
+              {submissionError && submissionStage === "form" && (
+                <p className="text-sm text-red-500 text-center animate-fadeInUp">
+                  {submissionError}
+                </p>
+              )}
               <Button
                 size="lg"
+                disabled={submissionStage !== "form"}
                 className="w-full bg-[#2ca699] hover:bg-[#23917a] text-white transform hover:scale-105 transition-transform duration-200 animate-fadeInUp"
                 style={{ animationDelay: "1.0s" }}
               >
@@ -1395,6 +1627,7 @@ export default function Home() {
           )}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

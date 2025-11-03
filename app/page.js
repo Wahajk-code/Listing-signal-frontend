@@ -1093,9 +1093,9 @@ export default function Home() {
             <div className="space-y-5">
               {[
                 {
-                  title: "Market Momentum",
+                  title: "Selling Score",
                   description:
-                    "Buyer demand, absorption rate, and days-on-market trajectories in your zip code.",
+                    "Your home’s real-time Signal strength — a data-backed snapshot of how favorable market conditions are for selling.",
                 },
                 {
                   title: "Pricing Confidence",

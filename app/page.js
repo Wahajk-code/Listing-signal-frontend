@@ -441,6 +441,96 @@ const howItWorksSteps = [
   },
 ];
 
+const signalScorePillars = [
+  {
+    title: "Market Appreciation Rate",
+    weight: "35%",
+    color: "#22c55e",
+    headline:
+      "How fast local prices are trending — if values are climbing, this boosts your Signal Score.",
+    callouts: [
+      {
+        icon: "🔺",
+        text: "Fast appreciation = higher signal (stronger market)",
+      },
+      {
+        icon: "🔻",
+        text: "Decline = lower signal (buyers have leverage)",
+      },
+    ],
+    indexLabel: "1️⃣",
+  },
+  {
+    title: "Sales Velocity",
+    weight: "30%",
+    color: "#facc15",
+    headline:
+      "Days on market + turnover rate = how quickly homes are actually selling nearby.",
+    callouts: [
+      {
+        icon: "🔺",
+        text: "Fewer days on market = stronger signal",
+      },
+      {
+        icon: "🔻",
+        text: "Slower absorption = weaker signal",
+      },
+    ],
+    indexLabel: "2️⃣",
+  },
+  {
+    title: "Inventory Pressure",
+    weight: "25%",
+    color: "#3b82f6",
+    headline:
+      "How much supply exists relative to demand.",
+    callouts: [
+      {
+        icon: "🏡",
+        text: "Low inventory → stronger seller position",
+      },
+      {
+        icon: "🏘️",
+        text: "High inventory → softer market",
+      },
+    ],
+    indexLabel: "3️⃣",
+  },
+  {
+    title: "Owner Equity",
+    weight: "10%",
+    color: "#f97316",
+    headline:
+      "Compares your AVM vs last recorded sale price — shows how much room you have to profit if you sell now.",
+    callouts: [],
+    indexLabel: "4️⃣",
+  },
+];
+
+const signalScoreRanges = [
+  {
+    range: "80–100",
+    label: "Strong Signal",
+    meaning: "Seller’s market — excellent timing to list.",
+    color: "#22c55e",
+    icon: "🟢",
+  },
+  {
+    range: "60–79",
+    label: "Steady Signal",
+    meaning: "Balanced market — smart prep, timing, and pricing matter most.",
+    color: "#facc15",
+    icon: "🟡",
+  },
+  {
+    range: "0–59",
+    label: "Building Signal",
+    meaning: "Market still forming momentum — monitor trends, but hold for strength.",
+    color: "#ef4444",
+    icon: "🔴",
+  },
+];
+
 const howItWorksOfferCatalog = howItWorksSteps.map((step, index) => ({
   "@type": "ListItem",
   position: index + 1,
@@ -1183,6 +1273,135 @@ export default function Home() {
                 </span>
               </div>
             </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Signal Score Meaning Section */}
+      <section
+        id="signal-meaning"
+        className="bg-gradient-to-b from-[#f5fbff] via-white to-[#eef6ff] px-4 py-20 sm:py-28 lg:py-32"
+      >
+        <div className="mx-auto max-w-7xl">
+          <div className="mx-auto mb-14 max-w-3xl text-center">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#d8f3ec] px-4 py-2 text-sm font-semibold text-[#0e3d70]">
+              <span aria-hidden="true">💡</span>
+              <span>What the Signal Score Really Means</span>
+            </div>
+            <p className="mt-6 text-lg text-gray-600">
+              Your Signal to Sell™ Score is a market-readiness indicator — not a
+              personal property grade.
+            </p>
+            <p className="mt-4 text-lg text-gray-600">
+              It measures how favorable current market conditions are for
+              selling a home like yours in your area right now.
+            </p>
+            <p className="mt-6 text-sm font-semibold uppercase tracking-[0.3em] text-[#2ca699]">
+              Built from four weighted data pillars (RentCast + MLS)
+            </p>
+          </div>
+          <div className="grid gap-12 lg:grid-cols-[1.2fr_1fr] lg:items-start">
+            <div className="space-y-6">
+              {signalScorePillars.map((pillar, idx) => (
+                <div
+                  key={pillar.title}
+                  className="group rounded-2xl border bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                  style={{
+                    borderColor: `${pillar.color}33`,
+                    boxShadow:
+                      idx % 2 === 0
+                        ? `0 22px 40px -28px ${pillar.color}80`
+                        : `0 18px 36px -28px ${pillar.color}66`,
+                  }}
+                >
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-base font-semibold text-[#09284b]"
+                      style={{ backgroundColor: `${pillar.color}26` }}
+                    >
+                      {pillar.indexLabel}
+                    </span>
+                    <h3 className="text-lg font-semibold text-[#09284b]">
+                      {pillar.title}
+                    </h3>
+                    <span className="ml-auto inline-flex items-center rounded-full bg-[#2ca699]/10 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-[#2ca699]">
+                      {pillar.weight}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-sm text-gray-600">
+                    {pillar.headline}
+                  </p>
+                  {pillar.callouts.length > 0 && (
+                    <ul className="mt-3 space-y-2 text-sm text-gray-600">
+                      {pillar.callouts.map((point) => (
+                        <li
+                          key={`${pillar.title}-${point.text}`}
+                          className="flex items-start gap-2"
+                        >
+                          <span className="text-base leading-5" aria-hidden="true">
+                            {point.icon}
+                          </span>
+                          <span>{point.text}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="space-y-6">
+              <Card className="border-[#2ca699]/20 bg-white/90 p-8 shadow-lg backdrop-blur">
+                <h3 className="text-xl font-semibold text-[#09284b]">
+                  Score Range
+                </h3>
+                <div className="mt-6 space-y-4">
+                  {signalScoreRanges.map((row) => (
+                    <div
+                      key={row.label}
+                      className="flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between"
+                      style={{
+                        borderColor: `${row.color}33`,
+                        backgroundColor: `${row.color}0d`,
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl" aria-hidden="true">
+                          {row.icon}
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold uppercase tracking-widest text-[#09284b]">
+                            {row.label}
+                          </p>
+                          <p className="text-xs font-medium text-[#2ca699]">
+                            {row.range}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-600 sm:max-w-xs">
+                        {row.meaning}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+              <p className="text-sm text-gray-600">
+                Your Signal Score reads the market around your home — how
+                quickly things are selling, where prices are trending, and how
+                much inventory there is. A higher score means the market is in
+                your favor; a lower one means it’s still building strength. It’s
+                a timing index for your neighborhood — not an appraisal, but a
+                smart indicator of how ready the market is for your home to
+                sell.
+              </p>
+              <Button
+                size="lg"
+                onClick={(e) => handleScroll("get-signal", e)}
+                className="group w-full bg-[#2ca699] text-white transition-all duration-300 hover:bg-[#09284b]"
+              >
+                Check My Signal Score
+                <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+              </Button>
+            </div>
           </div>
         </div>
       </section>

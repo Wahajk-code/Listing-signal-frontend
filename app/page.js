@@ -70,6 +70,8 @@ const US_STATE_ABBREVIATIONS = {
   "district of columbia": "DC",
 };
 
+const META_PIXEL_ID = "1197304222269861";
+
 const toStateCode = (value = "") => {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -870,6 +872,15 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    if (submissionStage === "completed" && typeof window !== "undefined") {
+      const fbq = window.fbq;
+      if (typeof fbq === "function") {
+        fbq("track", "Lead");
+      }
+    }
+  }, [submissionStage]);
+
   const handleGenerateSignal = (event) => {
     handleScroll("get-signal", event);
     if (isGenerating) return;
@@ -904,6 +915,29 @@ export default function Home() {
 
   return (
     <>
+      <Script id="meta-pixel" strategy="afterInteractive">
+        {`
+          !function(f,b,e,v,n,t,s)
+          {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+          n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+          if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+          n.queue=[];t=b.createElement(e);t.async=!0;
+          t.src=v;s=b.getElementsByTagName(e)[0];
+          s.parentNode.insertBefore(t,s)}(window, document,'script',
+          'https://connect.facebook.net/en_US/fbevents.js');
+          fbq('init', '${META_PIXEL_ID}');
+          fbq('track', 'PageView');
+        `}
+      </Script>
+      <noscript>
+        <img
+          height="1"
+          width="1"
+          style={{ display: "none" }}
+          src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`}
+          alt=""
+        />
+      </noscript>
       <Script
         id="listing-signal-structured-data"
         type="application/ld+json"
@@ -2014,6 +2048,15 @@ export default function Home() {
 
             {submissionStage === "completed" && (
               <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-3xl bg-white px-10 py-12 text-center shadow-2xl">
+                <noscript>
+                  <img
+                    height="1"
+                    width="1"
+                    style={{ display: "none" }}
+                    src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=Lead&noscript=1`}
+                    alt=""
+                  />
+                </noscript>
                 <h3 className="text-2xl font-semibold text-[#09284b]">
                   You’re all set!
                 </h3>

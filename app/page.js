@@ -759,6 +759,7 @@ export default function Home() {
       state: cleanedState,
       zip: formData.zip.trim(),
       timeline: formData.timeline,
+      intent: formData.intent,
       responseMode: "json",
     };
 

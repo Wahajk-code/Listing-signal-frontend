@@ -531,7 +531,7 @@ const signalScoreRanges = [
     range: "0–59",
     label: "Opportunity Signal",
     meaning:
-      "Strong potential forming in your area. - Your market is in an early growth stage. This is your chance to position your home ahead of the curve",
+      "Strong potential—Smart sellers prepare now to stay ahead of the curve",
     color: "#E38102",
     icon: "🟠",
   },
@@ -1353,8 +1353,7 @@ export default function Home() {
                 around you.
               </p>
               <p className="mt-6 text-sm font-semibold uppercase tracking-[0.3em] text-[#2ca699]">
-                Powered by 4 Core Market Signals — real-time MLS + RentCast
-                data.
+                Powered by 4 Core Market Signals - Realtime
               </p>
             </div>
             <div className="grid gap-12 lg:grid-cols-[1.2fr_1fr] lg:items-start">

@@ -71,6 +71,7 @@ const US_STATE_ABBREVIATIONS = {
 };
 
 const META_PIXEL_ID = "1197304222269861";
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 const toStateCode = (value = "") => {
   const trimmed = value.trim();
@@ -163,6 +164,68 @@ const Card = ({ children, className = "", ...props }) => {
   );
 };
 
+const mapPlaceToSuggestion = (place) => {
+  if (!place) return null;
+  const components = place.address_components || [];
+  const findAddressPart = (types, { short } = {}) => {
+    for (const component of components) {
+      if (types.some((type) => component.types.includes(type))) {
+        return short ? component.short_name : component.long_name;
+      }
+    }
+    return "";
+  };
+
+  const postalCode = findAddressPart(["postal_code"]);
+  const postalCodeSuffix = findAddressPart(["postal_code_suffix"]);
+  const streetNumber = findAddressPart(["street_number"]);
+  const route = findAddressPart(["route"]);
+  const neighborhood = findAddressPart([
+    "neighborhood",
+    "sublocality",
+    "sublocality_level_1",
+  ]);
+  const city = findAddressPart([
+    "locality",
+    "postal_town",
+    "sublocality",
+    "administrative_area_level_3",
+  ]);
+  const county = findAddressPart(["administrative_area_level_2"]);
+  const state = findAddressPart(["administrative_area_level_1"]);
+  const stateCode = findAddressPart(["administrative_area_level_1"], {
+    short: true,
+  });
+
+  const formattedPostal =
+    postalCode && postalCodeSuffix
+      ? `${postalCode}-${postalCodeSuffix}`
+      : postalCode;
+
+  const location = place.geometry?.location;
+  const lat =
+    typeof location?.lat === "function" ? location.lat() : location?.lat;
+  const lon =
+    typeof location?.lng === "function" ? location.lng() : location?.lng;
+
+  return {
+    label: place.formatted_address || "",
+    lat,
+    lon,
+    address: {
+      house_number: streetNumber || "",
+      road: route || "",
+      neighbourhood: neighborhood || "",
+      city: city || "",
+      town: city || "",
+      county: county || "",
+      state: state || "",
+      state_code: stateCode || "",
+      postcode: formattedPostal || "",
+    },
+  };
+};
+
 const AddressAutocomplete = ({
   value,
   onChange,
@@ -170,6 +233,7 @@ const AddressAutocomplete = ({
   error,
   placeholder = "123 Main St, City, State",
   name = "address",
+  isGoogleReady = false,
 }) => {
   const [suggestions, setSuggestions] = useState([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
@@ -178,6 +242,14 @@ const AddressAutocomplete = ({
   const containerRef = useRef(null);
   const cacheRef = useRef({});
   const activeRequestRef = useRef(null);
+  const inputRef = useRef(null);
+  const autocompleteRef = useRef(null);
+  const onSelectRef = useRef(onSelect);
+  const fallbackEnabled = !isGoogleReady;
+
+  useEffect(() => {
+    onSelectRef.current = onSelect;
+  }, [onSelect]);
 
   useEffect(() => {
     return () => {
@@ -191,6 +263,23 @@ const AddressAutocomplete = ({
   }, []);
 
   useEffect(() => {
+    if (!fallbackEnabled) {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+      if (activeRequestRef.current) {
+        activeRequestRef.current.abort();
+        activeRequestRef.current = null;
+      }
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setLoadingSuggestions(false);
+    }
+  }, [fallbackEnabled]);
+
+  useEffect(() => {
+    if (!fallbackEnabled) return;
     const handleClickOutside = (event) => {
       if (
         containerRef.current &&
@@ -202,7 +291,7 @@ const AddressAutocomplete = ({
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [fallbackEnabled]);
 
   const fetchSuggestions = async (query) => {
     if (cacheRef.current[query]) {
@@ -250,8 +339,7 @@ const AddressAutocomplete = ({
     }
   };
 
-  const handleChange = (event) => {
-    onChange(event);
+  const handleFallbackChange = (event) => {
     const query = event.target.value;
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -281,38 +369,96 @@ const AddressAutocomplete = ({
     }, 150);
   };
 
-  const handleSelect = (suggestion) => {
-    onSelect(suggestion);
+  const handleFallbackSelect = (suggestion) => {
+    onSelectRef.current?.(suggestion);
     setSuggestions([]);
     setShowSuggestions(false);
   };
 
+  useEffect(() => {
+    if (
+      !isGoogleReady ||
+      typeof window === "undefined" ||
+      !inputRef.current ||
+      !window.google?.maps?.places
+    ) {
+      return;
+    }
+
+    autocompleteRef.current = new window.google.maps.places.Autocomplete(
+      inputRef.current,
+      {
+        fields: ["address_components", "formatted_address", "geometry"],
+        types: ["address"],
+        componentRestrictions: { country: "us" },
+      }
+    );
+
+    const listener = autocompleteRef.current.addListener(
+      "place_changed",
+      () => {
+        const place = autocompleteRef.current?.getPlace();
+        if (!place || !place.formatted_address) {
+          return;
+        }
+        const mappedSuggestion = mapPlaceToSuggestion(place);
+        if (mappedSuggestion && onSelectRef.current) {
+          onSelectRef.current(mappedSuggestion);
+        }
+      }
+    );
+
+    return () => {
+      if (listener?.remove) {
+        listener.remove();
+      } else if (window.google?.maps?.event && listener) {
+        window.google.maps.event.removeListener(listener);
+      }
+      autocompleteRef.current = null;
+    };
+  }, [isGoogleReady]);
+
+  const handleFocus = () => {
+    if (
+      fallbackEnabled &&
+      value &&
+      value.length >= 3 &&
+      suggestions.length > 0
+    ) {
+      setShowSuggestions(true);
+    }
+  };
+
+  const hasQuery = (value?.length || 0) >= 3;
+
   return (
     <div className="relative" ref={containerRef}>
       <input
+        ref={inputRef}
         type="text"
         name={name}
         value={value}
-        onChange={handleChange}
-        onFocus={() => {
-          if (value && value.length >= 3 && suggestions.length > 0) {
-            setShowSuggestions(true);
+        onChange={(event) => {
+          onChange(event);
+          if (fallbackEnabled) {
+            handleFallbackChange(event);
           }
         }}
+        onFocus={handleFocus}
         placeholder={placeholder}
         className={`w-full px-4 py-3 rounded-lg border ${
           error ? "border-red-500" : "border-gray-300"
         } bg-white text-[#09284b] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2ca699] hover:border-[#2ca699] transition-all duration-200`}
         autoComplete="off"
       />
-      {loadingSuggestions && (
+      {fallbackEnabled && loadingSuggestions && (
         <div className="absolute inset-y-0 right-3 flex items-center">
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-[#2ca699]" />
         </div>
       )}
-      {showSuggestions &&
-        (suggestions.length > 0 ||
-          (!loadingSuggestions && value.length >= 3)) && (
+      {fallbackEnabled &&
+        showSuggestions &&
+        (suggestions.length > 0 || (!loadingSuggestions && hasQuery)) && (
           <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-lg border border-[#2ca699]/40 bg-white shadow-xl">
             {suggestions.length === 0 && !loadingSuggestions ? (
               <div className="px-4 py-3 text-sm text-gray-500">
@@ -327,7 +473,7 @@ const AddressAutocomplete = ({
                     <button
                       type="button"
                       onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => handleSelect(suggestion)}
+                      onClick={() => handleFallbackSelect(suggestion)}
                       className="flex w-full flex-col items-start gap-1 px-4 py-3 text-sm text-[#09284b] transition-colors hover:bg-[#f0fdfa]"
                     >
                       <span className="font-medium">
@@ -581,6 +727,7 @@ export default function Home() {
   const [smsConsent, setSmsConsent] = useState(false);
   const [smsError, setSmsError] = useState("");
   const [submissionError, setSubmissionError] = useState("");
+  const [isPlacesReady, setIsPlacesReady] = useState(false);
   const structuredData = useMemo(
     () => ({
       "@context": "https://schema.org",
@@ -658,6 +805,7 @@ export default function Home() {
       if (name === "address") {
         updated.city = "";
         updated.state = "";
+        updated.zip = "";
       }
       return updated;
     });
@@ -674,10 +822,13 @@ export default function Home() {
     const suggestionCity = extractCityFromAddressComponents(suggestionAddress);
     const suggestionState =
       extractStateFromAddressComponents(suggestionAddress);
+    const formattedZip = suggestion.address?.postcode
+      ? formatZipInput(suggestion.address.postcode)
+      : "";
     setFormData((prev) => ({
       ...prev,
       address: suggestion.label,
-      zip: suggestion.address?.postcode || prev.zip,
+      zip: formattedZip || prev.zip,
       city: suggestionCity || prev.city,
       state: suggestionState || prev.state,
     }));
@@ -930,6 +1081,18 @@ export default function Home() {
           fbq('track', 'PageView');
         `}
       </Script>
+      {GOOGLE_MAPS_API_KEY && (
+        <Script
+          id="google-maps-places"
+          strategy="afterInteractive"
+          src={`https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`}
+          onLoad={() => setIsPlacesReady(true)}
+          onError={(event) => {
+            console.error("Failed to load Google Maps Places script.", event);
+            setIsPlacesReady(false);
+          }}
+        />
+      )}
       <noscript>
         <img
           height="1"
@@ -1671,6 +1834,7 @@ export default function Home() {
                     onChange={handleInputChange}
                     onSelect={handleAddressSelect}
                     error={errors.address}
+                    isGoogleReady={isPlacesReady}
                   />
                   <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
                     <span>

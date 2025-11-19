@@ -700,6 +700,25 @@ const ctaOptions = [
   { label: "Decode My Timing" },
 ];
 
+const ownershipStatusOptions = [
+  "Yes",
+  "No",
+  "I’m a real estate agent",
+];
+
+const reportGoalOptions = [
+  "Considering selling",
+  "Checking equity",
+  "Comparing valuations",
+  "I’m an agent",
+  "Other",
+];
+
+const smsPreferenceOptions = [
+  { label: "Yes, text me updates", value: "true" },
+  { label: "No, email is enough", value: "false" },
+];
+
 export default function Home() {
   const initialFormState = {
     fullName: "",
@@ -710,7 +729,10 @@ export default function Home() {
     city: "",
     state: "",
     timeline: "",
+    ownershipStatus: "",
+    reportGoal: "",
     intent: "",
+    smsOptIn: null,
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -722,10 +744,7 @@ export default function Home() {
   const submitTimerRef = useRef(null);
   const [addressVerified, setAddressVerified] = useState(false);
   const [confirmDetails, setConfirmDetails] = useState(false);
-  const [submissionStage, setSubmissionStage] = useState("form"); // form | loading | sms | completed
-  const [smsPhone, setSmsPhone] = useState("");
-  const [smsConsent, setSmsConsent] = useState(false);
-  const [smsError, setSmsError] = useState("");
+  const [submissionStage, setSubmissionStage] = useState("form"); // form | loading | completed
   const [submissionError, setSubmissionError] = useState("");
   const [isPlacesReady, setIsPlacesReady] = useState(false);
   const structuredData = useMemo(
@@ -798,6 +817,8 @@ export default function Home() {
       nextValue = formatPhoneInput(value);
     } else if (name === "zip") {
       nextValue = formatZipInput(value);
+    } else if (name === "smsOptIn") {
+      nextValue = value === "true";
     }
 
     setFormData((prev) => {
@@ -872,6 +893,12 @@ export default function Home() {
     else if (!zipRegex.test(zipValue))
       newErrors.zip = "Enter a valid 5-digit ZIP (optionally with +4).";
     if (!formData.timeline) newErrors.timeline = "Timeline is required";
+    if (!formData.ownershipStatus)
+      newErrors.ownershipStatus = "Please let us know if you own the property.";
+    if (!formData.reportGoal)
+      newErrors.reportGoal = "Tell us your goal for this report.";
+    if (formData.smsOptIn === null)
+      newErrors.smsOptIn = "Choose whether you’d like SMS updates.";
     if (!formData.intent)
       newErrors.intent = "Please share your selling timeline.";
     if (!confirmDetails)
@@ -901,6 +928,8 @@ export default function Home() {
         ? state.trim().toUpperCase()
         : state?.trim() || "";
 
+    const wantsSmsUpdates = formData.smsOptIn === true;
+
     const payload = {
       fullName: formData.fullName.trim(),
       email: formData.email.trim(),
@@ -910,7 +939,10 @@ export default function Home() {
       state: cleanedState,
       zip: formData.zip.trim(),
       timeline: formData.timeline,
+      ownershipStatus: formData.ownershipStatus.trim(),
+      reportGoal: formData.reportGoal.trim(),
       intent: formData.intent,
+      sms: wantsSmsUpdates,
       responseMode: "json",
     };
 
@@ -925,9 +957,6 @@ export default function Home() {
     }
 
     setSubmissionStage("loading");
-    setSmsConsent(false);
-    setSmsError("");
-    setSmsPhone(formData.phone);
 
     try {
       const response = await fetch(API_URL, {
@@ -953,7 +982,7 @@ export default function Home() {
       clearTimeout(submitTimerRef.current);
     }
     submitTimerRef.current = setTimeout(() => {
-      setSubmissionStage("sms");
+      setSubmissionStage("completed");
       submitTimerRef.current = null;
     }, 3200);
   };
@@ -968,42 +997,10 @@ export default function Home() {
     }
   };
 
-  const handleSmsSubmit = (e) => {
-    e.preventDefault();
-    if (!smsConsent) {
-      setSmsError("Please consent to receive SMS updates.");
-      return;
-    }
-    const digitsOnly = smsPhone.replace(/\D/g, "");
-    if (!smsPhone.trim() || digitsOnly.length < 10) {
-      setSmsError("Enter a valid phone number to receive texts.");
-      return;
-    }
-    console.log("SMS opt-in:", { phone: smsPhone, consent: smsConsent });
-    setSmsError("");
-    setSubmissionStage("completed");
-  };
-
-  const handleSkipSms = () => {
-    setSmsError("");
-    setSmsConsent(false);
-    setSubmissionStage("completed");
-    setSubmissionError("");
-  };
-
   const handleFinish = () => {
     resetForm();
     setSubmissionStage("form");
-    setSmsConsent(false);
-    setSmsPhone("");
-    setSmsError("");
     setSubmissionError("");
-  };
-
-  const handleSmsPhoneChange = (e) => {
-    const formatted = formatPhoneInput(e.target.value);
-    setSmsPhone(formatted);
-    setSmsError("");
   };
 
   useEffect(() => {
@@ -1929,6 +1926,84 @@ export default function Home() {
                 </div>
                 <div
                   className="relative animate-fadeInUp"
+                  style={{ animationDelay: "0.92s" }}
+                >
+                  <span className="block text-sm font-semibold text-[#09284b]">
+                    Are you the owner of this property?
+                    <span className="text-[#2ca699]">*</span>
+                  </span>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    {ownershipStatusOptions.map((option) => {
+                      const isSelected = formData.ownershipStatus === option;
+                      return (
+                        <label
+                          key={option}
+                          className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-4 py-3 text-sm transition-all duration-200 ${
+                            isSelected
+                              ? "border-[#2ca699] bg-[#f0fdfa] text-[#09284b]"
+                              : "border-gray-300 bg-white text-gray-600 hover:border-[#2ca699]/50"
+                          }`}
+                        >
+                          <span>{option}</span>
+                          <input
+                            type="radio"
+                            name="ownershipStatus"
+                            value={option}
+                            checked={isSelected}
+                            onChange={handleInputChange}
+                            className="text-[#2ca699] focus:ring-[#2ca699]"
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {errors.ownershipStatus && (
+                    <p className="mt-2 text-xs text-red-500">
+                      {errors.ownershipStatus}
+                    </p>
+                  )}
+                </div>
+                <div
+                  className="relative animate-fadeInUp"
+                  style={{ animationDelay: "0.94s" }}
+                >
+                  <span className="block text-sm font-semibold text-[#09284b]">
+                    What’s your goal with this report?
+                    <span className="text-[#2ca699]">*</span>
+                  </span>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {reportGoalOptions.map((option) => {
+                      const isSelected = formData.reportGoal === option;
+                      return (
+                        <label
+                          key={option}
+                          className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-4 py-3 text-sm transition-all duration-200 ${
+                            isSelected
+                              ? "border-[#2ca699] bg-[#f0fdfa] text-[#09284b]"
+                              : "border-gray-300 bg-white text-gray-600 hover:border-[#2ca699]/50"
+                          }`}
+                        >
+                          <span>{option}</span>
+                          <input
+                            type="radio"
+                            name="reportGoal"
+                            value={option}
+                            checked={isSelected}
+                            onChange={handleInputChange}
+                            className="text-[#2ca699] focus:ring-[#2ca699]"
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {errors.reportGoal && (
+                    <p className="mt-2 text-xs text-red-500">
+                      {errors.reportGoal}
+                    </p>
+                  )}
+                </div>
+                <div
+                  className="relative animate-fadeInUp"
                   style={{ animationDelay: "0.95s" }}
                 >
                   <span className="block text-sm font-semibold text-[#09284b]">
@@ -1963,7 +2038,47 @@ export default function Home() {
                 </div>
                 <div
                   className="relative animate-fadeInUp"
-                  style={{ animationDelay: "0.98s" }}
+                  style={{ animationDelay: "0.97s" }}
+                >
+                  <span className="block text-sm font-semibold text-[#09284b]">
+                    Would you like SMS updates when your Signal is ready?
+                    <span className="text-[#2ca699]">*</span>
+                  </span>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {smsPreferenceOptions.map((option) => {
+                      const prefersSms = option.value === "true";
+                      const isSelected = formData.smsOptIn === prefersSms;
+                      return (
+                        <label
+                          key={option.value}
+                          className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-4 py-3 text-sm transition-all duration-200 ${
+                            isSelected
+                              ? "border-[#2ca699] bg-[#f0fdfa] text-[#09284b]"
+                              : "border-gray-300 bg-white text-gray-600 hover:border-[#2ca699]/50"
+                          }`}
+                        >
+                          <span>{option.label}</span>
+                          <input
+                            type="radio"
+                            name="smsOptIn"
+                            value={option.value}
+                            checked={isSelected}
+                            onChange={handleInputChange}
+                            className="text-[#2ca699] focus:ring-[#2ca699]"
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {errors.smsOptIn && (
+                    <p className="mt-2 text-xs text-red-500">
+                      {errors.smsOptIn}
+                    </p>
+                  )}
+                </div>
+                <div
+                  className="relative animate-fadeInUp"
+                  style={{ animationDelay: "0.99s" }}
                 >
                   <label className="flex items-start gap-3 rounded-lg border border-[#2ca699]/30 bg-[#f6fffd] px-4 py-3 text-sm text-[#09284b] shadow-sm">
                     <input
@@ -2147,69 +2262,6 @@ export default function Home() {
               </div>
             )}
 
-            {submissionStage === "sms" && (
-              <div className="w-full max-w-xl rounded-3xl bg-white p-8 shadow-2xl">
-                <h3 className="text-2xl font-semibold text-[#09284b] text-center">
-                  Would you like your Signal texted to you as soon as it’s
-                  ready?
-                </h3>
-                <p className="mt-3 text-sm text-gray-600 text-center">
-                  Keep your timing intel close—opt in for a text alert the
-                  moment your Signal is live.
-                </p>
-                <form onSubmit={handleSmsSubmit} className="mt-6 space-y-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-[#09284b] mb-2">
-                      Mobile Number
-                    </label>
-                    <input
-                      type="tel"
-                      value={smsPhone}
-                      onChange={handleSmsPhoneChange}
-                      placeholder="(555) 987-6543"
-                      className="w-full rounded-lg border border-gray-300 px-4 py-3 text-[#09284b] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2ca699] hover:border-[#2ca699] transition-all duration-200"
-                    />
-                  </div>
-                  <label className="flex items-start gap-3 rounded-lg border border-[#2ca699]/30 bg-[#f6fffd] px-4 py-3 text-sm text-[#09284b]">
-                    <input
-                      type="checkbox"
-                      checked={smsConsent}
-                      onChange={(event) => {
-                        setSmsConsent(event.target.checked);
-                        setSmsError("");
-                      }}
-                      className="mt-1 h-4 w-4 rounded border-gray-300 text-[#2ca699] focus:ring-[#2ca699]"
-                    />
-                    <span>
-                      Yes, text me updates about my Signal. I understand
-                      standard messaging rates may apply and I can opt out
-                      anytime.
-                    </span>
-                  </label>
-                  {smsError && (
-                    <p className="text-xs text-red-500">{smsError}</p>
-                  )}
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <Button
-                      type="submit"
-                      size="lg"
-                      className="flex-1 bg-[#2ca699] text-white hover:bg-[#09284b]"
-                    >
-                      Send My Signal via Text
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="flex-1 border border-[#2ca699]/40 bg-white text-[#09284b] hover:bg-[#f0fdfa]"
-                      onClick={handleSkipSms}
-                    >
-                      No thanks
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            )}
-
             {submissionStage === "completed" && (
               <div className="flex w-full max-w-md flex-col items-center gap-4 rounded-3xl bg-white px-10 py-12 text-center shadow-2xl">
                 <noscript>
@@ -2226,7 +2278,7 @@ export default function Home() {
                 </h3>
                 <p className="text-sm text-gray-600">
                   We’ll deliver your Signal report via email
-                  {smsConsent ? " and text" : ""} as soon as it’s ready.
+                  {formData.smsOptIn ? " and text" : ""} as soon as it’s ready.
                 </p>
                 <Button
                   size="lg"

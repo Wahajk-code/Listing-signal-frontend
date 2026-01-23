@@ -660,25 +660,24 @@ const signalScorePillars = [
 
 const signalScoreRanges = [
   {
-    range: "80–100",
-    label: "Strong Signal",
-    meaning: "Seller’s market — excellent timing to list.",
+    range: "75-100",
+    label: "Seller Advantage",
+    meaning: "Market conditions are clearly favoring sellers.",
     color: "#22c55e",
     icon: "🟢",
   },
   {
-    range: "60–79",
-    label: "Steady Signal",
-    meaning: "Balanced market — smart prep, timing, and pricing matter most.",
+    range: "60-74",
+    label: "Seller Window",
+    meaning: "Market is active and sellable with the right positioning.",
     color: "#facc15",
     icon: "🟡",
   },
   {
-    range: "0–59",
-    label: "Opportunity Signal",
-    meaning:
-      "Strong potential—Smart sellers prepare now to stay ahead of the curve",
-    color: "#E38102",
+    range: "45-59",
+    label: "Early Opportunity",
+    meaning: "Momentum is forming. Strategy matters more than speed.",
+    color: "#f97316",
     icon: "🟠",
   },
 ];
@@ -692,6 +691,7 @@ const howItWorksOfferCatalog = howItWorksSteps.map((step, index) => ({
 
 const CTA_TARGET_ID = "get-signal";
 const CTA_TARGET_URL = `${SITE_URL}#${CTA_TARGET_ID}`;
+const normalizeSignalScore = (score) => Math.max(30, Math.min(score, 100));
 
 const ctaOptions = [
   { label: "Check My Signal" },
@@ -1037,14 +1037,14 @@ export default function Home() {
       clearInterval(gaugeIntervalRef.current);
     }
     setIsGenerating(true);
-    setSignalScore(0);
+    setSignalScore(30);
     const target = 65 + Math.floor(Math.random() * 26); // 65-90
     let current = 0;
     gaugeIntervalRef.current = setInterval(() => {
       current += 3;
       setSignalScore((prev) => {
         const next = prev + 3;
-        return next > target ? target : next;
+        return normalizeSignalScore(next > target ? target : next);
       });
       if (current >= target) {
         clearInterval(gaugeIntervalRef.current);
@@ -1054,13 +1054,13 @@ export default function Home() {
     }, 80);
   };
 
-  const gaugeProgress = Math.max(0, Math.min(signalScore, 100));
+  const gaugeProgress = normalizeSignalScore(signalScore);
   const timingLabel =
-    gaugeProgress >= 85
-      ? "Prime Window"
-      : gaugeProgress >= 70
-      ? "Momentum Building"
-      : "Monitoring";
+    gaugeProgress >= 75
+      ? "Seller Advantage"
+      : gaugeProgress >= 60
+      ? "Seller Window"
+      : "Early Opportunity";
 
   return (
     <>
